@@ -149,10 +149,17 @@ export class Page<T> implements PageData<T> {
 
 /** A list request: await it for the first page, or iterate it (for await) for every item of every page. */
 export class PagePromise<T> extends APIPromise<Page<T>> implements AsyncIterable<T> {
+  constructor(result: Promise<{ data: Page<T>; response: ResponseInfo }>, private readonly signal?: AbortSignal) {
+    super(result);
+  }
   async *[Symbol.asyncIterator](): AsyncIterator<T> {
     let page: Page<T> | null = await this;
     while (page) {
-      yield* page.data;
+      // the caller's abort also stops the items of a page already loaded
+      for (const item of page.data) {
+        if (this.signal?.aborted) throw abortReason(this.signal);
+        yield item;
+      }
       page = await page.getNextPage();
     }
   }
@@ -211,7 +218,7 @@ export class BaseClient {
       new PagePromise(this.send<PageData<T>>(r, options).then(({ data, response }) => ({
         data: new Page<T>(data, r, paging, load),
         response,
-      })));
+      })), options.signal);
     return load(req);
   }
 
@@ -232,15 +239,13 @@ export class BaseClient {
       Authorization: `Bearer ${this.apiKey}`,
       Accept: 'application/json',
       'User-Agent': `zapsmtp-node/${VERSION} (${runtime()})`,
-      ...this.defaultHeaders,
     };
+    // the caller's default headers replace ours whatever their case
+    for (const [k, v] of Object.entries(this.defaultHeaders)) setHeader(headers, k, v);
     for (const [k, v] of Object.entries(req.headers ?? {})) if (v !== undefined) headers[k] = v;
     if (req.idempotent) headers['Idempotency-Key'] = options.idempotencyKey ?? randomUUID();
-    // the caller's headers replace ours whatever their case
-    for (const [k, v] of Object.entries(options.headers ?? {})) {
-      for (const h of Object.keys(headers)) if (h.toLowerCase() === k.toLowerCase()) delete headers[h];
-      headers[k] = v;
-    }
+    // and so do the headers of this request
+    for (const [k, v] of Object.entries(options.headers ?? {})) setHeader(headers, k, v);
     // an empty key turns deduplication off on the server, so a retried send
     // could go out twice: refused before anything is sent
     const key = Object.entries(headers).find(([h]) => h.toLowerCase() === 'idempotency-key');
@@ -267,7 +272,7 @@ export class BaseClient {
         // the request may have reached the server, so only a request that is
         // safe to repeat is sent again
         if (attempt < maxRetries && safe) {
-          await sleep(backoff(attempt, null));
+          await sleep(backoff(attempt, null), options.signal);
           continue;
         }
         throw new ConnectionError(err instanceof Error ? err.message : String(err), { cause: err });
@@ -280,7 +285,7 @@ export class BaseClient {
       if (res.ok) return { data: parsed as T, response: info };
       const err = errorFor(res.status, parsed, res.headers);
       if (attempt < maxRetries && retryable(res.status, err.code, safe)) {
-        await sleep(backoff(attempt, retryAfterSeconds(res.headers)));
+        await sleep(backoff(attempt, retryAfterSeconds(res.headers)), options.signal);
         continue;
       }
       throw err;
@@ -291,7 +296,7 @@ export class BaseClient {
   // cover a server that sends its headers and then stalls.
   private async attempt(url: string, init: RequestInit, options: RequestOptions) {
     const signal = options.signal;
-    if (signal?.aborted) throw signal.reason ?? new Error('aborted');
+    if (signal?.aborted) throw abortReason(signal);
     const ctrl = new AbortController();
     const timeout = options.timeout ?? this.timeout;
     const timer = setTimeout(() => ctrl.abort(new Error(`timed out after ${timeout} ms`)), timeout);
@@ -362,7 +367,29 @@ export function nextPage<T>(req: Request, page: PageData<T>, paging: Paging): Re
   }
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** A wait between attempts: the caller's abort ends it at once, with the caller's reason. */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(abortReason(signal));
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(abortReason(signal!));
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+const abortReason = (signal: AbortSignal): unknown => signal.reason ?? new Error('aborted');
+
+/** Sets a header, replacing any spelling of its name. */
+function setHeader(headers: Record<string, string>, name: string, value: string): void {
+  for (const h of Object.keys(headers)) if (h.toLowerCase() === name.toLowerCase()) delete headers[h];
+  headers[name] = value;
+}
 
 function runtime(): string {
   const g = globalThis as any;

@@ -88,3 +88,106 @@ it('a broken response body is wrapped as a connection error, and a safe request 
   expect(await p).toEqual({ id: 'e1' });
   expect(retried).toHaveBeenCalledTimes(2);
 });
+
+it('aborting during Retry-After rejects promptly with the caller reason', async () => {
+  vi.useFakeTimers();
+  const fetch = vi.fn(async () => new Response(JSON.stringify({ error: { code: 'service_unavailable' } }), {
+    status: 503, headers: { 'Retry-After': '60' },
+  }));
+  const zap = new ZapSMTP('test-key', { fetch: fetch as typeof globalThis.fetch });
+  const controller = new AbortController();
+  const reason = new Error('cancel the pending retry');
+  let settled = false;
+  let caught: unknown;
+  const pending = zap.emails.get('email-1', { signal: controller.signal }).then(
+    () => { settled = true; },
+    (error: unknown) => { settled = true; caught = error; },
+  );
+  await vi.advanceTimersByTimeAsync(0);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  controller.abort(reason);
+  await vi.advanceTimersByTimeAsync(1);
+  const settledImmediately = settled;
+  // drain a delay that was not cut short, so a failed assertion leaves no work behind
+  await vi.advanceTimersByTimeAsync(60_000);
+  await pending;
+  expect(caught).toBe(reason);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(settledImmediately).toBe(true);
+});
+
+it('aborting auto paging stops before another cached item is delivered', async () => {
+  const fetch = vi.fn(async () => new Response(JSON.stringify({
+    object: 'list', data: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], has_more: false,
+  })));
+  const zap = new ZapSMTP('test-key', { fetch: fetch as typeof globalThis.fetch });
+  const controller = new AbortController();
+  const reason = new Error('stop processing emails');
+  const ids: Array<string | undefined> = [];
+  let caught: unknown;
+  try {
+    for await (const email of zap.emails.list({}, { signal: controller.signal })) {
+      ids.push(email.id);
+      controller.abort(reason);
+    }
+  } catch (error) { caught = error; }
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(ids).toEqual(['a']);
+  expect(caught).toBe(reason);
+});
+
+it('default Authorization overrides the generated header regardless of casing', async () => {
+  let authorization: string | null = null;
+  const fetch = vi.fn(async (_url: unknown, init?: RequestInit) => {
+    // this is how native fetch normalizes the supplied header record on the wire
+    const headers = new Headers(init?.headers);
+    authorization = headers.get('authorization');
+    return new Response('{}');
+  });
+  const zap = new ZapSMTP('test-key', {
+    fetch: fetch as typeof globalThis.fetch, maxRetries: 0,
+    defaultHeaders: { authorization: 'Bearer override-key' },
+  });
+  await zap.usage.get();
+  expect(authorization).toBe('Bearer override-key');
+});
+
+it('aborting during the backoff after a network error rejects promptly with the caller reason', async () => {
+  vi.useFakeTimers();
+  const fetch = vi.fn(async () => { throw new TypeError('connection reset'); });
+  const controller = new AbortController();
+  const reason = new Error('cancel the pending retry');
+  let caught: unknown = null;
+  const p = client(fetch).emails.get('email-1', { signal: controller.signal }).catch((e: unknown) => { caught = e; });
+  await vi.advanceTimersByTimeAsync(0);
+  controller.abort(reason);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(caught).toBe(reason);
+  await p;
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+it('a backoff with a signal that is never aborted still retries', async () => {
+  vi.useFakeTimers();
+  const answers = [new Response('{}', { status: 503, headers: { 'Retry-After': '1' } }), new Response('{"id":"e1"}')];
+  const fetch = vi.fn(async () => answers.shift()!);
+  const p = client(fetch).emails.get('email-1', { signal: new AbortController().signal });
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(await p).toEqual({ id: 'e1' });
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+it('an abort between the answer and the backoff does not wait out the backoff', async () => {
+  const controller = new AbortController();
+  const reason = new Error('aborted while reading Retry-After');
+  // the abort lands after the attempt finished, before the wait starts
+  const headers = new Headers({ 'Retry-After': '60' });
+  const get = headers.get.bind(headers);
+  headers.get = (name: string) => {
+    if (name === 'retry-after') controller.abort(reason);
+    return get(name);
+  };
+  const fetch = vi.fn(async () => Object.defineProperty(new Response('{}', { status: 503 }), 'headers', { value: headers }));
+  await expect(client(fetch).emails.get('email-1', { signal: controller.signal })).rejects.toBe(reason);
+  expect(fetch).toHaveBeenCalledTimes(1);
+});

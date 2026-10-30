@@ -1,0 +1,39 @@
+# Publishes zapsmtp to npm when a version tag (v0.1.0) is pushed, or by hand
+# (Run workflow). No token: npm trusts this workflow (trusted publishing,
+# configured on npmjs.com for ZapSMTP/zapsmtp-node, publish.yml, environment
+# npm) and adds provenance.
+#
+# The full test suite needs the shared conformance cases and spec of the
+# ZapSMTP SDK monorepo and runs there before a release is exported here.
+name: publish
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@latest
+      - name: Tag matches the package version
+        if: github.ref_type == 'tag'
+        run: |
+          v=$(node -p 'require("./package.json").version')
+          [ "${GITHUB_REF_NAME}" = "v$v" ] || { echo "tag ${GITHUB_REF_NAME} != v$v"; exit 1; }
+      - run: npm ci && npm run build
+      - name: The package loads (ESM and CommonJS)
+        run: |
+          node -e 'const z = require("./dist/cjs/index.js"); new z.ZapSMTP({ apiKey: "zap_test" })'
+          node --input-type=module -e 'import { ZapSMTP } from "./dist/esm/index.js"; new ZapSMTP({ apiKey: "zap_test" })'
+      - run: npm publish --access public

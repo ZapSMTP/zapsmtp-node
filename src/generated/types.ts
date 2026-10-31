@@ -530,7 +530,7 @@ export interface StatsMetricsParams {
   /** RFC 3339 end (exclusive). Default: now. */
   to?: string;
   /** hour (ranges up to 31 days) or day for series. Default: hour up to 48 hours, else day. */
-  granularity?: string;
+  granularity?: "hour" | "day";
   /** domain, stream, tag or provider: adds groups, one row per value, busiest first. */
   dimension?: string;
   /** Only this sending (From) domain. */

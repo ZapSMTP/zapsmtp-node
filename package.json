@@ -1,6 +1,6 @@
 {
   "name": "zapsmtp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The official Node.js and TypeScript SDK for the ZapSMTP email API",
   "license": "MIT",
   "homepage": "https://zapsmtp.com/docs/sdks/",

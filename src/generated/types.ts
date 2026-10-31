@@ -1592,6 +1592,7 @@ export interface SendBatchResponse {
 }
 
 export interface SendBatchResponseData {
+  failed_recipients?: string[];
   id: string;
   index: number;
   reply_to?: string;
@@ -1792,7 +1793,7 @@ export interface Template {
   updated_at?: string;
   variable_names?: string[];
   variable_schema?: TemplateVariableSchema[];
-  variables?: Record<string, string>;
+  variables?: Record<string, unknown>;
 }
 
 export interface TemplateAsset {
@@ -1871,7 +1872,7 @@ export interface Thread {
   has_more?: boolean;
   id: string;
   inbound_count: number;
-  last_inbound_at: string;
+  last_inbound_at: string | null;
   last_message: ThreadLastMessage;
   last_message_at: string;
   message_count: number;

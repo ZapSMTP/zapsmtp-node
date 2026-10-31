@@ -139,7 +139,7 @@ export interface SendEmailParams {
 
 /** Parameters of emails.list. */
 export interface EmailsListParams {
-  /** 1-100; out-of-range values fall back to 20. Default: 20. */
+  /** 1-100. Limits: 422 invalid_parameter otherwise. Default: 20. */
   limit?: number;
   /**
    * Cursor: an email id (UUIDv7) or RFC 3339 time; returns emails accepted before it. An email id
@@ -154,18 +154,19 @@ export interface EmailsListParams {
   after?: string;
   /**
    * Filter by latest status. status=scheduled lists pending scheduled sends instead (different item
-   * shape, ordered by scheduled time ascending, has_more always false, other filters/cursors ignored).
+   * shape, ordered by scheduled time ascending, has_more always false, other filters/cursors ignored,
+   * though they must be valid).
    */
   status?: "queued" | "delivered" | "delivery_delayed" | "bounced" | "complained" | "failed" | "opened" | "clicked" | "replied" | "suppressed" | "scheduled";
   /** Case-insensitive substring of a recipient or subject, or an exact email id. */
   q?: string;
   /**
-   * Look-back window in days, 1-90 (other values ignored). Always capped by the plan's log retention.
-   * Default: 30.
+   * Look-back window in days, 1-90. Always capped by the plan's log retention. Limits: 422
+   * invalid_parameter otherwise. Default: 30.
    */
   days?: number;
   stream?: "transactional" | "broadcast";
-  /** Filter live or test-mode (sandbox) traffic; other values ignored. */
+  /** Filter live or test-mode (sandbox) traffic. Limits: 422 invalid_parameter for other values. */
   mode?: "live" | "test";
   /** Exact match on a metadata value, e.g. metadata[order_id]=A-1042. Repeatable for several keys. */
   metadata?: Record<string, string>;
@@ -205,7 +206,7 @@ export interface EmailsSpamCheckParams {
 
 /** Parameters of emails.receiving.list. */
 export interface EmailsReceivingListParams {
-  /** 1-100; out-of-range falls back to 20. Default: 20. */
+  /** 1-100. Limits: 422 invalid_parameter otherwise. Default: 20. */
   limit?: number;
   /**
    * Cursor: an email id or RFC 3339 time; returns messages received before it. An email id gives an
@@ -242,7 +243,7 @@ export interface EmailsReceivingGetParams {
 
 /** Parameters of emails.receiving.attachments.list. */
 export interface EmailsReceivingAttachmentsListParams {
-  /** 1-100; when omitted or out of range all attachments are returned. */
+  /** 1-100; when omitted all attachments are returned. Limits: 422 invalid_parameter otherwise. */
   limit?: number;
   /** Attachment id; returns attachments after it (ignored if unknown). */
   after?: string;
@@ -352,7 +353,7 @@ export interface EmailsReceivingReplyParams {
 
 /** Parameters of threads.list. */
 export interface ThreadsListParams {
-  /** 1-100; out-of-range falls back to 20. Default: 20. */
+  /** 1-100. Limits: 422 invalid_parameter otherwise. Default: 20. */
   limit?: number;
   /**
    * Cursor: the last_message_at of the last conversation you have (RFC 3339). Limits: 422
@@ -364,9 +365,15 @@ export interface ThreadsListParams {
    * are neither skipped nor repeated.
    */
   before_id?: string;
-  /** true: only conversations whose last human email came in. */
+  /**
+   * true: only conversations whose last human email came in. Limits: 422 invalid_parameter unless true
+   * or false.
+   */
   awaiting_reply?: boolean;
-  /** true: only conversations with an email received after their read mark. */
+  /**
+   * true: only conversations with an email received after their read mark. Limits: 422
+   * invalid_parameter unless true or false.
+   */
   unread?: boolean;
   /** Only conversations this address took part in (case-insensitive). */
   participant?: string;
@@ -497,14 +504,14 @@ export interface InboundForwardDestinationsCreateParams {
 
 /** Parameters of stats.get. */
 export interface StatsGetParams {
-  /** 1-720; out-of-range falls back to 24. Default: 24. */
+  /** 1-720. Limits: 422 invalid_parameter otherwise. Default: 24. */
   hours?: number;
 }
 
 /** Parameters of stats.timeseries. */
 export interface StatsTimeseriesParams {
   /**
-   * 1-720; out-of-range falls back to 24. Bucket size: <=1h → 60 s, <=6h → 300 s, <=24h → 1800 s,
+   * 1-720 (422 invalid_parameter otherwise). Bucket size: <=1h → 60 s, <=6h → 300 s, <=24h → 1800 s,
    * <=168h → 10800 s, otherwise 43200 s. Default: 24.
    */
   hours?: number;
@@ -512,7 +519,7 @@ export interface StatsTimeseriesParams {
 
 /** Parameters of stats.breakdown. */
 export interface StatsBreakdownParams {
-  /** 1-720; out-of-range falls back to 24. Default: 24. */
+  /** 1-720. Limits: 422 invalid_parameter otherwise. Default: 24. */
   hours?: number;
 }
 
@@ -581,7 +588,7 @@ export interface DomainsUpdateParams {
 
 /** Parameters of domains.getDmarc. */
 export interface DomainsGetDmarcParams {
-  /** 1-180; out-of-range falls back to 30. Default: 30. */
+  /** 1-180. Limits: 422 invalid_parameter otherwise. Default: 30. */
   days?: number;
 }
 
@@ -806,7 +813,7 @@ export interface TemplatesRenderSourceParams {
 
 /** Parameters of suppressions.list. */
 export interface SuppressionsListParams {
-  /** 1-1000; out-of-range falls back to 100. Default: 100. */
+  /** 1-1000. Limits: 422 invalid_parameter otherwise. Default: 100. */
   limit?: number;
   /** Opaque cursor from next_cursor. Limits: 422 invalid_parameter "invalid after cursor" */
   after?: string;
@@ -830,7 +837,7 @@ export interface SuppressionsCreateParams {
 
 /** Parameters of logs.list. */
 export interface LogsListParams {
-  /** 1–100. Default: 20. */
+  /** 1–100. Limits: 422 invalid_parameter otherwise. Default: 20. */
   limit?: number;
   /** A log id: return older entries. */
   before?: string;

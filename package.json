@@ -4,6 +4,11 @@
   "description": "The official Node.js and TypeScript SDK for the ZapSMTP email API",
   "license": "MIT",
   "homepage": "https://zapsmtp.com/docs/sdks/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZapSMTP/zapsmtp-node.git"
+  },
+  "bugs": "https://github.com/ZapSMTP/zapsmtp-node/issues",
   "keywords": ["email", "smtp", "transactional email", "zapsmtp", "api", "sdk"],
   "type": "module",
   "engines": { "node": ">=18" },

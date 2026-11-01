@@ -853,6 +853,12 @@ export interface LogsListParams {
   api_key_id?: string;
 }
 
+/** Parameters of account.update. */
+export interface AccountUpdateParams {
+  /** 1–100 characters. */
+  name: string;
+}
+
 /** Parameters of apiKeys.update. */
 export interface ApiKeysUpdateParams {
   /** 1–100 characters. */
@@ -989,6 +995,55 @@ export interface VariablesSetGlobalParams {
   value?: string;
   /** What it is for. Limits: at most 500 bytes → 422 invalid_parameter */
   description?: string;
+}
+
+export interface AccountInfo {
+  account: AccountProfile;
+  object?: string;
+  plan: AccountPlan;
+  smtp: AccountSmtp;
+  usage: AccountUsage;
+}
+
+export interface AccountPlan {
+  daily_emails: number;
+  id: string;
+  included_emails: number;
+  max_domains: number;
+  max_smtp_credentials: number;
+  name: string;
+  overage_cents_per_1000: number;
+  price_cents: number;
+  retention_days: number;
+  smtp_relay?: boolean;
+  tier: string;
+}
+
+export interface AccountProfile {
+  created_at: string;
+  current_period_end: string | null;
+  dedicated_ips: number;
+  id: string;
+  monthly_quota: number;
+  name: string;
+  plan: string;
+  rate_limit_per_sec: number;
+  spend_cap_cents: number | null;
+  status: string;
+  subscription_status: string;
+}
+
+export interface AccountSmtp {
+  host: string;
+  password: string;
+  ports: number[];
+  username: string;
+}
+
+export interface AccountUsage {
+  month: string;
+  monthly_quota: number;
+  sent: number;
 }
 
 export interface Action {

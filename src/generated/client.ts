@@ -2,6 +2,8 @@
 import { APIPromise, BaseClient, PagePromise, type ClientOptions, type RequestOptions } from '../core.js';
 import { verifyWebhook, verifyWebhookEvents, type VerifyOptions, type WebhookEvent } from '../webhooks.js';
 import type {
+  AccountInfo,
+  AccountUpdateParams,
   Action,
   ActionsCreateParams,
   ActionsUpdateParams,
@@ -1111,6 +1113,29 @@ export class UsageResource {
   }
 }
 
+export class AccountResource {
+  constructor(private readonly client: BaseClient) {
+  }
+
+  /**
+   * Retrieve the account. The account the key belongs to: its name, status and sending rate limit, the
+   * plan with its limits, this month’s sent count and the SMTP relay settings. Requires a full-access
+   * key. spend_cap_cents is null without a spending cap. For the month’s overage and limit use GET
+   * /usage. Plan changes and payments are made in the dashboard, never with an API key.
+   */
+  get(options: RequestOptions = {}): APIPromise<AccountInfo> {
+    return this.client.request<AccountInfo>({ method: 'GET', path: '/account' }, options);
+  }
+
+  /**
+   * Rename the account. Rename the account. Answers the account as GET /account does. Requires a
+   * full-access live key; test keys get 403 test_key_restricted.
+   */
+  update(params: AccountUpdateParams, options: RequestOptions = {}): APIPromise<AccountInfo> {
+    return this.client.request<AccountInfo>({ method: 'PATCH', path: '/account', body: params }, options);
+  }
+}
+
 export class TemplateModulesResource {
   constructor(private readonly client: BaseClient) {
   }
@@ -1324,6 +1349,7 @@ export class ZapSMTP extends BaseClient {
   readonly dedicatedIps: DedicatedIpsResource;
   readonly logs: LogsResource;
   readonly usage: UsageResource;
+  readonly account: AccountResource;
   readonly templateModules: TemplateModulesResource;
   readonly templateAssets: TemplateAssetsResource;
   readonly templateTimers: TemplateTimersResource;
@@ -1347,6 +1373,7 @@ export class ZapSMTP extends BaseClient {
     this.dedicatedIps = new DedicatedIpsResource(this);
     this.logs = new LogsResource(this);
     this.usage = new UsageResource(this);
+    this.account = new AccountResource(this);
     this.templateModules = new TemplateModulesResource(this);
     this.templateAssets = new TemplateAssetsResource(this);
     this.templateTimers = new TemplateTimersResource(this);

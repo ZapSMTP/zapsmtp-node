@@ -131,8 +131,9 @@ export interface SendEmailParams {
    */
   template?: TemplateRef;
   /**
-   * required or verified: deliver only over TLS (verified: with a valid certificate for the receiving
-   * server). Raises the domain's policy, never lowers it.
+   * opportunistic, required or verified: required delivers only over TLS, verified only with a valid
+   * certificate for the receiving server. The stricter of this and the domain’s policy applies: it
+   * raises the domain’s policy, never lowers it.
    */
   tls?: string;
 }
@@ -349,6 +350,12 @@ export interface EmailsReceivingReplyParams {
    * must be within 7 days"
    */
   scheduled_at?: string;
+  /**
+   * opportunistic, required or verified: required delivers only over TLS, verified only with a valid
+   * certificate for the receiving server. The stricter of this and the domain’s policy applies: it
+   * raises the domain’s policy, never lowers it.
+   */
+  tls?: string;
 }
 
 /** Parameters of threads.list. */

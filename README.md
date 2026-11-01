@@ -103,10 +103,12 @@ try {
 
 ## Retries and timeouts
 
-A request that failed on the way (429, 408, 5xx, a lost connection) is tried again twice by default,
+A request that failed on the way (408, 429, 500, 502, 503, 504, a lost connection) is tried again twice by default,
 waiting as the API's `Retry-After` says or backing off exponentially. Only requests that are safe to
 repeat are retried: reads, updates by `PUT`, deletes, and sends, which always carry an
-`Idempotency-Key` (pass your own with `{ idempotencyKey }` to make retries of your own safe too).
+`Idempotency-Key` (pass your own with `{ idempotencyKey }` to make retries of your own safe too). Other `POST` and `PATCH` requests are retried only on 429. A 429 for a quota
+(`monthly_quota_exceeded`, `daily_quota_exceeded`) or `thread_reply_limit` is never retried; a 409
+`idempotency_request_in_progress` is.
 
 ```ts
 const zap = new ZapSMTP({ apiKey: 'zap_...', maxRetries: 4, timeout: 20_000 });
@@ -137,6 +139,17 @@ app.post('/webhooks/zapsmtp', express.raw({ type: 'application/json' }), (req, r
 
 `verifyWebhook` throws `WebhookVerificationError` when the signature is wrong or older than five minutes.
 
+An endpoint created with `batch: true` receives an array of events; `verifyWebhook` refuses it. Use
+`verifyWebhookEvents`, which takes both shapes and returns a list (one element for a single event):
+
+```ts
+import { verifyWebhookEvents } from 'zapsmtp';
+
+for (const event of verifyWebhookEvents(req.body, req.headers, process.env.ZAP_WEBHOOK_SECRET!)) {
+  handle(event);
+}
+```
+
 ## Configuration
 
 | Option | Environment | Default |
@@ -154,7 +167,7 @@ Every method is listed with its parameters in the [API reference](https://zapsmt
 The SDK's resources mirror it: `zap.emails`, `zap.emails.receiving`, `zap.threads`, `zap.domains`,
 `zap.webhooks`, `zap.actions`, `zap.templates`, `zap.variables`, `zap.templateModules`,
 `zap.templateAssets`, `zap.templateTimers`, `zap.inbound`, `zap.suppressions`, `zap.stats`,
-`zap.apiKeys`, `zap.smtpCredentials`, `zap.logs`, `zap.usage`, `zap.simulator`, `zap.dedicatedIps`.
+`zap.apiKeys`, `zap.smtpCredentials`, `zap.logs`, `zap.usage`, `zap.account`, `zap.simulator`, `zap.dedicatedIps`.
 
 ## Development
 

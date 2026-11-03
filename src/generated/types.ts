@@ -1011,6 +1011,46 @@ export interface VariablesSetGlobalParams {
   description?: string;
 }
 
+/** Parameters of emailValidations.create. */
+export interface EmailValidationsCreateParams {
+  /** The address to check. */
+  email: string;
+}
+
+/** Parameters of emailValidations.createBatch. */
+export interface EmailValidationsCreateBatchParams {
+  /** 1–100 addresses, each at most 320 characters. */
+  emails: string[];
+}
+
+/** Parameters of placementTests.create. */
+export interface PlacementTestsCreateParams {
+  /** Sender on one of your verified domains. Leave out (with template) for a manual test. */
+  from?: string;
+  /** As in Send an email. */
+  subject?: string;
+  /** As in Send an email. */
+  html?: string;
+  /** As in Send an email. */
+  text?: string;
+  /** A stored template and its variables, as in Send an email. */
+  template?: TemplateRef;
+  /** Extra headers, as in Send an email. */
+  headers?: Record<string, string>;
+  /** As in Send an email. */
+  tags?: Tag[];
+  /** As in Send an email. */
+  stream?: string;
+}
+
+/** Parameters of placementTests.list. */
+export interface PlacementTestsListParams {
+  /** 1-100. Limits: 422 invalid_parameter otherwise. Default: 20. */
+  limit?: number;
+  /** A test id from next_cursor. Limits: 422 invalid_parameter otherwise. */
+  after?: string;
+}
+
 export interface AccountInfo {
   account: AccountProfile;
   object?: string;
@@ -1398,6 +1438,36 @@ export interface EmailShare {
   url: string;
 }
 
+export interface EmailValidation {
+  checks: EmailValidationChecks;
+  did_you_mean: string | null;
+  email: string;
+  normalized: string;
+  object: string;
+  reason: string;
+  reasons: string[];
+  result: string;
+  score: number;
+}
+
+export interface EmailValidationChecks {
+  accept_all: boolean | null;
+  disposable: boolean;
+  domain: string;
+  free: boolean;
+  mailbox: string;
+  mx: string[];
+  previously_bounced: boolean;
+  role: boolean;
+  suppressed: boolean;
+  syntax: boolean;
+}
+
+export interface EmailValidationList {
+  data: EmailValidation[];
+  object: string;
+}
+
 export interface ForwardDestination {
   confirmation_sent_at: string;
   created_at: string;
@@ -1560,6 +1630,51 @@ export interface MetricsTotals {
   opened: number;
   sent: number;
   suppressed: number;
+}
+
+export interface PlacementAuth {
+  dkim: string;
+  dmarc: string;
+  spf: string;
+}
+
+export interface PlacementResult {
+  address: string;
+  auth: PlacementAuth | null;
+  email_id: string | null;
+  folder: string | null;
+  placement: string | null;
+  provider: string;
+  received_at: string | null;
+}
+
+export interface PlacementSummary {
+  forums: number;
+  inbox: number;
+  inbox_rate: number;
+  missing: number;
+  pending: number;
+  primary: number;
+  promotions: number;
+  social: number;
+  spam: number;
+  total: number;
+  updates: number;
+}
+
+export interface PlacementTest {
+  created_at: string;
+  ends_at: string;
+  finished_at: string | null;
+  from: string | null;
+  id: string;
+  mode: string;
+  object: string;
+  results: PlacementResult[];
+  status: string;
+  subject: string | null;
+  summary: PlacementSummary;
+  token: string;
 }
 
 export interface ReceivedEmail {

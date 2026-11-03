@@ -25,6 +25,10 @@ import type {
   Email,
   EmailContent,
   EmailShare,
+  EmailValidation,
+  EmailValidationList,
+  EmailValidationsCreateBatchParams,
+  EmailValidationsCreateParams,
   EmailsListParams,
   EmailsReceivingAttachmentsListParams,
   EmailsReceivingGetParams,
@@ -47,6 +51,9 @@ import type {
   Log,
   LogsListParams,
   Metrics,
+  PlacementTest,
+  PlacementTestsCreateParams,
+  PlacementTestsListParams,
   ReceivedEmail,
   ReceivedEmailAction,
   RenderedTemplate,
@@ -1333,6 +1340,81 @@ export class VariablesResource {
   }
 }
 
+export class EmailValidationsResource {
+  constructor(private readonly client: BaseClient) {
+  }
+
+  /**
+   * Validate an address. Check one address before you send to it: syntax, the domain and its mail
+   * servers, throw-away and role addresses, typos, your suppression list and earlier hard bounces. Any
+   * API key; test keys too (nothing is sent or changed). result: deliverable (every check passed),
+   * risky (it may arrive, but sending to it can hurt your reputation), undeliverable (it will bounce)
+   * or unknown (the domain's DNS did not answer: try again later). reason is the most serious of
+   * reasons: invalid_syntax, reserved_domain, domain_not_found, no_mail_server, mailbox_not_found,
+   * previously_bounced (hard bounced on ZapSMTP in the last 180 days), dns_error, suppressed (on your
+   * suppression list), disposable, accept_all, role_address; ok when there is none. checks.mailbox is
+   * exists, not_found, unknown or not_checked. Nothing is ever sent to the address. did_you_mean
+   * suggests a likely intended address when the domain looks like a typo. Each address counts against
+   * your plan's monthly validations (Free 100, Pro 5,000, Scale 25,000); over it: 429
+   * monthly_quota_exceeded. Results are not stored.
+   */
+  create(params: EmailValidationsCreateParams, options: RequestOptions = {}): APIPromise<EmailValidation> {
+    return this.client.request<EmailValidation>({ method: 'POST', path: '/email-validations', body: params }, options);
+  }
+
+  /**
+   * Validate up to 100 addresses. Check up to 100 addresses in one call; results come back in the
+   * order given. Any API key; test keys too (nothing is sent or changed). Each address counts against
+   * the plan's monthly validations; a batch that would pass the allowance is refused whole.
+   */
+  createBatch(params: EmailValidationsCreateBatchParams, options: RequestOptions = {}): APIPromise<EmailValidationList> {
+    return this.client.request<EmailValidationList>({ method: 'POST', path: '/email-validations/batch', body: params }, options);
+  }
+}
+
+export class PlacementTestsResource {
+  constructor(private readonly client: BaseClient) {
+  }
+
+  /**
+   * Start a placement test. Start an inbox placement test: see whether a message lands in the inbox, a
+   * Gmail tab or spam at the big mailbox providers. Requires a full-access live key; test keys get 403
+   * test_key_restricted. With a message (from and content, or a template) one copy goes to each seed
+   * mailbox through your account, like any send (each counts as a sent email; test keys cannot).
+   * Without one the test is manual: send your message to every address in results from anywhere, with
+   * token in the subject or text, within 2 hours. ZapSMTP then reads each seed mailbox (Gmail,
+   * Outlook, Yahoo and others) and records where the copy landed: inbox, a Gmail tab (promotions,
+   * social, updates, forums), spam, or missing once the test ends (15 minutes after a send). auth is
+   * the provider's own SPF, DKIM and DMARC verdict. status is running until every seed has an answer
+   * or the test ends, then done. summary.inbox_rate = inbox (any tab) / seeds with an answer. Your
+   * plan includes a number of tests a month (Free 1, Pro 10, Scale 50); over it: 429
+   * monthly_quota_exceeded.
+   */
+  create(params: PlacementTestsCreateParams = {}, options: RequestOptions = {}): APIPromise<PlacementTest> {
+    return this.client.request<PlacementTest>({ method: 'POST', path: '/placement-tests', body: params }, options);
+  }
+
+  /**
+   * Retrieve a placement test. Retrieve a placement test with where each copy landed. Requires a
+   * full-access key. ZapSMTP then reads each seed mailbox (Gmail, Outlook, Yahoo and others) and
+   * records where the copy landed: inbox, a Gmail tab (promotions, social, updates, forums), spam, or
+   * missing once the test ends (15 minutes after a send). auth is the provider's own SPF, DKIM and
+   * DMARC verdict. status is running until every seed has an answer or the test ends, then done.
+   * summary.inbox_rate = inbox (any tab) / seeds with an answer.
+   */
+  get(id: string, options: RequestOptions = {}): APIPromise<PlacementTest> {
+    return this.client.request<PlacementTest>({ method: 'GET', path: '/placement-tests/{id}', pathParams: { id } }, options);
+  }
+
+  /**
+   * List placement tests. List placement tests, newest first, with cursor pagination. Requires a
+   * full-access key. Pass next_cursor as after for the next page.
+   */
+  list(params: PlacementTestsListParams = {}, options: RequestOptions = {}): PagePromise<PlacementTest> {
+    return this.client.requestPage<PlacementTest>({ method: 'GET', path: '/placement-tests', query: params }, options, 'cursor');
+  }
+}
+
 /** The ZapSMTP API client. */
 export class ZapSMTP extends BaseClient {
   readonly emails: EmailsResource;
@@ -1355,6 +1437,8 @@ export class ZapSMTP extends BaseClient {
   readonly templateTimers: TemplateTimersResource;
   readonly actions: ActionsResource;
   readonly variables: VariablesResource;
+  readonly emailValidations: EmailValidationsResource;
+  readonly placementTests: PlacementTestsResource;
 
   /** new ZapSMTP() reads ZAP_API_KEY; new ZapSMTP('zap_…') or new ZapSMTP({ apiKey, baseUrl, timeout, maxRetries }). */
   constructor(apiKeyOrOptions?: string | ClientOptions, options: ClientOptions = {}) {
@@ -1379,5 +1463,7 @@ export class ZapSMTP extends BaseClient {
     this.templateTimers = new TemplateTimersResource(this);
     this.actions = new ActionsResource(this);
     this.variables = new VariablesResource(this);
+    this.emailValidations = new EmailValidationsResource(this);
+    this.placementTests = new PlacementTestsResource(this);
   }
 }
